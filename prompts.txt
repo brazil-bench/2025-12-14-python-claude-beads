@@ -894,3 +894,40 @@ describe what was done and push everything to github
   Pushed to:
 
   https://github.com/brazil-bench/2025-12-14-python-claude-beads
+
+
+$ claude update
+$ claude --dangerously-skip-permissions /resume
+
+ > Fix all open issues. Run: gh issue list to see them, be sure to avoid async bdd, as this doesn't work with pytest-bdd 
+
+ ● All 4 GitHub issues have been fixed and closed. Here's a summary:
+
+  Summary of Fixes
+
+  Issue #1: Query Performance Benchmarks
+
+  - Added 7 performance benchmark tests in tests/test_performance.py
+  - Simple lookups verified to complete in < 2 seconds
+  - Aggregate queries verified to complete in < 5 seconds
+
+  Issue #2: Additional MCP Tools
+
+  - Added 6 new tools for 20+ sample question coverage:
+    - get_team_roster: Get players at a specific club
+    - find_derbies: Find classic derby matches (Fla-Flu, Gre-Nal, etc.)
+    - compare_teams: Compare two teams with head-to-head record
+    - get_highest_scoring_matches: Matches with most total goals
+    - get_team_form: Recent form (W/D/L record)
+    - get_available_seasons: List seasons in database
+  - Total: 16 MCP tools now available
+
+  Issue #3: Spec Compliance
+
+  - All 16/16 requirements now met (100% compliance)
+
+  Issue #4: Self-Contained Tests
+
+  - Tests now use testcontainers for Neo4j
+  - No external database required to run tests
+  - 25 BDD test scenarios all passing
