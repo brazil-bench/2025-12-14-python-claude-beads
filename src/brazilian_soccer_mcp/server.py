@@ -339,6 +339,117 @@ async def list_tools() -> list[Tool]:
                 "type": "object",
                 "properties": {}
             }
+        ),
+
+        # Extended Tools for 20+ questions coverage
+        Tool(
+            name="get_team_roster",
+            description="Get all players at a specific club with average ratings.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "club": {
+                        "type": "string",
+                        "description": "Club name (e.g., 'Santos', 'Fluminense')"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum players to return (default: 30)"
+                    }
+                },
+                "required": ["club"]
+            }
+        ),
+        Tool(
+            name="find_derbies",
+            description="Find classic derby matches (Fla-Flu, Corinthians vs Palmeiras, Gre-Nal, etc.).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "season": {
+                        "type": "integer",
+                        "description": "Filter by season year"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum results (default: 50)"
+                    }
+                }
+            }
+        ),
+        Tool(
+            name="compare_teams",
+            description="Compare statistics of two teams including head-to-head record.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "team1": {
+                        "type": "string",
+                        "description": "First team name"
+                    },
+                    "team2": {
+                        "type": "string",
+                        "description": "Second team name"
+                    },
+                    "season": {
+                        "type": "integer",
+                        "description": "Filter by season"
+                    }
+                },
+                "required": ["team1", "team2"]
+            }
+        ),
+        Tool(
+            name="get_highest_scoring_matches",
+            description="Find matches with the most total goals scored.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "competition": {
+                        "type": "string",
+                        "description": "Filter by competition"
+                    },
+                    "season": {
+                        "type": "integer",
+                        "description": "Filter by season"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Number of results (default: 20)"
+                    }
+                }
+            }
+        ),
+        Tool(
+            name="get_team_form",
+            description="Get recent form for a team (last N matches with W/D/L record).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "team": {
+                        "type": "string",
+                        "description": "Team name"
+                    },
+                    "num_matches": {
+                        "type": "integer",
+                        "description": "Number of recent matches (default: 5)"
+                    }
+                },
+                "required": ["team"]
+            }
+        ),
+        Tool(
+            name="get_available_seasons",
+            description="Get list of available seasons in the database.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "competition": {
+                        "type": "string",
+                        "description": "Filter by competition"
+                    }
+                }
+            }
         )
     ]
 
@@ -427,6 +538,44 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
         elif name == "list_teams":
             result = {"teams": executor.get_all_teams()}
+
+        # Extended tools
+        elif name == "get_team_roster":
+            result = executor.get_team_roster(
+                club=arguments["club"],
+                limit=arguments.get("limit", 30)
+            )
+
+        elif name == "find_derbies":
+            result = executor.find_derbies(
+                season=arguments.get("season"),
+                limit=arguments.get("limit", 50)
+            )
+
+        elif name == "compare_teams":
+            result = executor.compare_teams(
+                team1=arguments["team1"],
+                team2=arguments["team2"],
+                season=arguments.get("season")
+            )
+
+        elif name == "get_highest_scoring_matches":
+            result = executor.get_highest_scoring_matches(
+                competition=arguments.get("competition"),
+                season=arguments.get("season"),
+                limit=arguments.get("limit", 20)
+            )
+
+        elif name == "get_team_form":
+            result = executor.get_team_form(
+                team=arguments["team"],
+                num_matches=arguments.get("num_matches", 5)
+            )
+
+        elif name == "get_available_seasons":
+            result = executor.get_available_seasons(
+                competition=arguments.get("competition")
+            )
 
         else:
             result = {"error": f"Unknown tool: {name}"}

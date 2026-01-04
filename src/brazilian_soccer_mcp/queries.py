@@ -852,3 +852,301 @@ class QueryExecutor:
             "season": season,
             "teams": [{"team": r["team"], "goals": r["total_goals"]} for r in results]
         }
+
+    # =========================================================================
+    # ADDITIONAL TOOLS (Phase 3 Extended)
+    # =========================================================================
+
+    def get_team_roster(self, club: str, limit: int = 30) -> dict:
+        """
+        Get all players at a specific club.
+
+        Args:
+            club: Club name
+            limit: Maximum players to return
+
+        Returns:
+            Dictionary with team roster
+        """
+        query = """
+        MATCH (p:Player)
+        WHERE toLower(p.club) CONTAINS toLower($club)
+        RETURN p
+        ORDER BY p.overall DESC
+        LIMIT $limit
+        """
+
+        results = self.conn.execute(query, {"club": club, "limit": limit})
+        players = [r["p"] for r in results]
+
+        # Calculate team averages
+        avg_overall = sum(p.get("overall", 0) for p in players) / len(players) if players else 0
+        avg_age = sum(p.get("age", 0) for p in players) / len(players) if players else 0
+
+        return {
+            "club": club,
+            "total_players": len(players),
+            "avg_overall": round(avg_overall, 1),
+            "avg_age": round(avg_age, 1),
+            "players": players
+        }
+
+    def find_derbies(
+        self,
+        season: Optional[int] = None,
+        limit: int = 50
+    ) -> dict:
+        """
+        Find classic derby matches between rival teams.
+
+        Classic Brazilian derbies include:
+        - Fla-Flu (Flamengo vs Fluminense)
+        - Corinthians vs Palmeiras
+        - Gre-Nal (Gremio vs Internacional)
+        - Atletico-MG vs Cruzeiro
+
+        Args:
+            season: Filter by season
+            limit: Maximum results
+
+        Returns:
+            Dictionary with derby matches
+        """
+        derby_pairs = [
+            ("Flamengo", "Fluminense"),
+            ("Corinthians", "Palmeiras"),
+            ("Gremio", "Internacional"),
+            ("Atletico-MG", "Cruzeiro"),
+            ("Sao Paulo", "Santos"),
+            ("Botafogo", "Vasco"),
+        ]
+
+        conditions = []
+        for team1, team2 in derby_pairs:
+            conditions.append(
+                f"((m.home_team CONTAINS '{team1}' AND m.away_team CONTAINS '{team2}') OR "
+                f"(m.home_team CONTAINS '{team2}' AND m.away_team CONTAINS '{team1}'))"
+            )
+
+        derby_condition = " OR ".join(conditions)
+        season_filter = f" AND m.season = {season}" if season else ""
+
+        query = f"""
+        MATCH (m:Match)
+        WHERE ({derby_condition}){season_filter}
+        RETURN m
+        ORDER BY m.datetime DESC
+        LIMIT $limit
+        """
+
+        results = self.conn.execute(query, {"limit": limit})
+        matches = [r["m"] for r in results]
+
+        return {
+            "season": season,
+            "total_derbies": len(matches),
+            "matches": matches
+        }
+
+    def compare_teams(
+        self,
+        team1: str,
+        team2: str,
+        season: Optional[int] = None
+    ) -> dict:
+        """
+        Compare statistics of two teams.
+
+        Args:
+            team1: First team name
+            team2: Second team name
+            season: Optional season filter
+
+        Returns:
+            Dictionary with comparison data
+        """
+        stats1 = self.get_team_statistics(team1, season=season)
+        stats2 = self.get_team_statistics(team2, season=season)
+        h2h = self.find_matches_between_teams(team1, team2)
+
+        return {
+            "team1": {
+                "name": stats1["team"],
+                "stats": stats1["overall"]
+            },
+            "team2": {
+                "name": stats2["team"],
+                "stats": stats2["overall"]
+            },
+            "head_to_head": {
+                "total_matches": h2h["total_matches"],
+                "team1_wins": h2h["team1_wins"],
+                "team2_wins": h2h["team2_wins"],
+                "draws": h2h["draws"]
+            },
+            "season": season
+        }
+
+    def get_highest_scoring_matches(
+        self,
+        competition: Optional[str] = None,
+        season: Optional[int] = None,
+        limit: int = 20
+    ) -> dict:
+        """
+        Find matches with the most total goals.
+
+        Args:
+            competition: Filter by competition
+            season: Filter by season
+            limit: Number of results
+
+        Returns:
+            Dictionary with highest scoring matches
+        """
+        conditions = []
+        params = {"limit": limit}
+
+        if competition:
+            conditions.append("m.competition CONTAINS $competition")
+            params["competition"] = competition
+
+        if season:
+            conditions.append("m.season = $season")
+            params["season"] = season
+
+        where_clause = " AND ".join(conditions) if conditions else "TRUE"
+
+        query = f"""
+        MATCH (m:Match)
+        WHERE {where_clause}
+        RETURN m
+        ORDER BY m.total_goals DESC
+        LIMIT $limit
+        """
+
+        results = self.conn.execute(query, params)
+        matches = []
+        for r in results:
+            m = r["m"]
+            matches.append({
+                "datetime": m.get("datetime"),
+                "home_team": m.get("home_team"),
+                "away_team": m.get("away_team"),
+                "home_goals": m.get("home_goals"),
+                "away_goals": m.get("away_goals"),
+                "total_goals": m.get("total_goals"),
+                "competition": m.get("competition"),
+                "season": m.get("season")
+            })
+
+        return {
+            "total": len(matches),
+            "matches": matches
+        }
+
+    def get_team_form(
+        self,
+        team: str,
+        num_matches: int = 5
+    ) -> dict:
+        """
+        Get recent form for a team (last N matches).
+
+        Args:
+            team: Team name
+            num_matches: Number of recent matches to consider
+
+        Returns:
+            Dictionary with form information
+        """
+        team_norm = normalize_team_name(team)
+
+        query = """
+        MATCH (m:Match)
+        WHERE m.home_team = $team OR m.away_team = $team
+        RETURN m
+        ORDER BY m.datetime DESC
+        LIMIT $limit
+        """
+
+        results = self.conn.execute(query, {"team": team_norm, "limit": num_matches})
+        matches = [r["m"] for r in results]
+
+        # Calculate form
+        form = []
+        points = 0
+        goals_for = 0
+        goals_against = 0
+
+        for m in matches:
+            home = m.get("home_team")
+            hg = m.get("home_goals", 0)
+            ag = m.get("away_goals", 0)
+
+            if normalize_team_name(home) == team_norm:
+                goals_for += hg
+                goals_against += ag
+                if hg > ag:
+                    form.append("W")
+                    points += 3
+                elif hg < ag:
+                    form.append("L")
+                else:
+                    form.append("D")
+                    points += 1
+            else:
+                goals_for += ag
+                goals_against += hg
+                if ag > hg:
+                    form.append("W")
+                    points += 3
+                elif ag < hg:
+                    form.append("L")
+                else:
+                    form.append("D")
+                    points += 1
+
+        return {
+            "team": team_norm,
+            "last_matches": num_matches,
+            "form": "".join(form),
+            "points": points,
+            "max_points": num_matches * 3,
+            "goals_for": goals_for,
+            "goals_against": goals_against,
+            "matches": matches
+        }
+
+    def get_available_seasons(self, competition: Optional[str] = None) -> dict:
+        """
+        Get list of available seasons in the database.
+
+        Args:
+            competition: Filter by competition
+
+        Returns:
+            Dictionary with available seasons
+        """
+        conditions = ["m.season IS NOT NULL"]
+        params = {}
+
+        if competition:
+            conditions.append("m.competition CONTAINS $competition")
+            params["competition"] = competition
+
+        where_clause = " AND ".join(conditions)
+
+        query = f"""
+        MATCH (m:Match)
+        WHERE {where_clause}
+        RETURN DISTINCT m.season as season, count(m) as match_count
+        ORDER BY m.season DESC
+        """
+
+        results = self.conn.execute(query, params)
+
+        return {
+            "competition": competition,
+            "seasons": [{"year": r["season"], "matches": r["match_count"]} for r in results]
+        }

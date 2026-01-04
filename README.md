@@ -13,14 +13,19 @@ An MCP (Model Context Protocol) server that provides a knowledge graph interface
 - Team name normalization for consistent matching
 - Multiple date format handling
 
-### Phase 2: MCP Server with Query Tools
+### Phase 2: MCP Server with Query Tools (16 total)
 - **Match Queries**
   - `find_matches`: Search by team, season, competition
   - `get_head_to_head`: Get matches between two teams with statistics
+  - `find_derbies`: Find classic derby matches (Fla-Flu, Gre-Nal, etc.)
+  - `get_highest_scoring_matches`: Matches with most goals
 
 - **Team Queries**
   - `get_team_stats`: Comprehensive statistics (overall, home, away)
   - `list_teams`: List all teams in database
+  - `get_team_roster`: Get players at a specific club
+  - `get_team_form`: Recent form (W/D/L record)
+  - `compare_teams`: Compare two teams with head-to-head
 
 - **Player Queries**
   - `find_players`: Search by name, nationality, club, position, rating
@@ -32,6 +37,7 @@ An MCP (Model Context Protocol) server that provides a knowledge graph interface
   - `get_league_stats`: Aggregate statistics (goals, win rates)
   - `get_competition_winners`: Historical winners
   - `get_biggest_wins`: Matches with largest margins
+  - `get_available_seasons`: List seasons in database
 
 ## Installation
 
@@ -102,11 +108,16 @@ pytest tests/test_analytics.py -v
 
 ### Test Coverage
 
-- **18 BDD scenarios** covering:
+- **25 BDD scenarios** covering:
   - Match queries (head-to-head, filtering, home/away)
   - Team statistics (comprehensive stats, season filtering)
   - Player searches (nationality, club, ratings)
   - Analytics (standings, biggest wins, league stats, winners)
+  - Performance benchmarks (< 2s simple, < 5s aggregate)
+
+### Self-Contained Tests
+
+Tests use [testcontainers](https://testcontainers.com/) to automatically start a Neo4j container. No external database required.
 
 ## Project Structure
 
